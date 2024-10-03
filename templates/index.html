@@ -1,1 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <style>
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #f4f7fc;
+    color: #333;
+}
 
+#sidebar {
+    width: 250px;
+    height: 100vh;
+    overflow-y: auto;
+    background-color: #1f2937;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    box-sizing: border-box;
+    color: white;
+    box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+#sidebar h3 {
+    margin-top: 0;
+    color: #a0aec0;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: bold;
+}
+
+#main {
+    flex-grow: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    box-sizing: border-box;
+    background-color: #ffffff;
+}
+
+#chat-container {
+    flex-grow: 1;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    overflow-y: auto;
+    padding: 15px;
+    margin-bottom: 10px;
+    background-color: #f9fafb;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.3s ease;
+}
+
+#chat-container:hover {
+    box-shadow: 0px 6px 15px rgba(0, 0, 0, 0.1);
+}
+
+#user-input, #send-button {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e0;
+    box-sizing: border-box;
+    transition: border 0.3s ease, box-shadow 0.3s ease;
+}
+
+#user-input:focus, #send-button:focus {
+    border-color: #3182ce;
+    box-shadow: 0 0 0 4px rgba(66, 153, 225, 0.5);
+    outline: none;
+}
+
+#send-button {
+    background-color: #3182ce;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#send-button:hover {
+    background-color: #2b6cb0;
+}
+
+#new-chat-button {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #4a5568;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#new-chat-button:hover {
+    background-color: #2d3748;
+}
+
+.chat-entry {
+    cursor: pointer;
+    padding: 10px;
+    margin-bottom: 10px;
+    background-color: #2d3748;
+    border-radius: 8px;
+    color: white;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.chat-entry:hover {
+    background-color: #4a5568;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    #sidebar {
+        width: 180px;
+    }
+
+    #main {
+        padding: 15px;
+    }
+}
+
+@media (max-width: 480px) {
+    body {
+        flex-direction: column;
+    }
+
+    #sidebar {
+        width: 100%;
+        height: auto;
+        padding: 10px;
+        border-right: none;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    #main {
+        height: calc(100vh - 50px);
+    }
+}
+
+
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <button id="new-chat-button">New Chat</button>
+        <h3>Chat History</h3>
+        {% for chat in chat_history %}
+            <div class="chat-entry" data-chat-id="{{ chat.id }}">
+                {{ chat.label }}
+            </div>
+        {% endfor %}
+    </div>
+    <div id="main">
+        <div id="chat-container"></div>
+        <input type="text" id="user-input" placeholder="Type your message...">
+        <button id="send-button">Send</button>
+    </div>
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const newChatButton = document.getElementById('new-chat-button');
+        let chatHistory = {{ chat_history|tojson|safe }};
+        let currentChatId = null;
+
+        function addMessage(sender, message) {
+            const messageElement = document.createElement('p');
+            messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
+            chatContainer.appendChild(messageElement);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function loadChat(chatId) {
+            chatContainer.innerHTML = '';
+            currentChatId = chatId;
+            const chat = chatHistory.find(c => c.id === chatId);
+            if (chat) {
+                chat.messages.forEach(msg => addMessage(msg.sender, msg.message));
+            }
+        }
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (message) {
+                addMessage('You', message);
+                userInput.value = '';
+                try {
+                    const response = await fetch('/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ message: message, chatId: currentChatId }),
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        addMessage('AI', data.response);
+                        currentChatId = data.chatId;
+                        
+                        // Update chat history
+                        const existingChat = chatHistory.find(c => c.id === currentChatId);
+                        if (existingChat) {
+                            existingChat.messages.push(
+                                {sender: 'You', message: message},
+                                {sender: 'AI', message: data.response}
+                            );
+                        } else {
+                            const newChat = {
+                                id: currentChatId,
+                                label: message.substring(0, 75) + (message.length > 75 ? "..." : ""),
+                                messages: [
+                                    {sender: 'You', message: message},
+                                    {sender: 'AI', message: data.response}
+                                ]
+                            };
+                            chatHistory.push(newChat);
+                            updateSidebar();
+                        }
+                    } else {
+                        addMessage('System', 'Error: Failed to get response from the server.');
+                    }
+                } catch (error) {
+                    addMessage('System', 'Error: ' + error.message);
+                }
+            }
+        }
+
+        function updateSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const newEntry = document.createElement('div');
+            newEntry.className = 'chat-entry';
+            newEntry.textContent = chatHistory[chatHistory.length - 1].label;
+            newEntry.dataset.chatId = chatHistory[chatHistory.length - 1].id;
+            newEntry.onclick = () => loadChat(chatHistory[chatHistory.length - 1].id);
+            sidebar.appendChild(newEntry);
+        }
+
+        function newChat() {
+            currentChatId = null;
+            chatContainer.innerHTML = '';
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        newChatButton.addEventListener('click', newChat);
+
+        // Set up chat entry click listeners
+        document.querySelectorAll('.chat-entry').forEach(entry => {
+            entry.addEventListener('click', () => loadChat(parseInt(entry.dataset.chatId)));
+        });
+
+        // Load the most recent chat on page load
+        if (chatHistory.length > 0) {
+            loadChat(chatHistory[chatHistory.length - 1].id);
+        }
+    </script>
+</body>
+</html>
